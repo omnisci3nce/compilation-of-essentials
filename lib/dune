@@ -1,2 +1,3 @@
 (library
- (name coe))
+ (name coe)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord)))

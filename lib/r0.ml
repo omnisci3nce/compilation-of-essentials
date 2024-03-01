@@ -25,6 +25,8 @@ type tok_type =
   | Identifier of string
   | Read
   | EOF
+  [@@deriving show]
+
 type literal = Num
 
 type token = { token_type : tok_type }
@@ -73,31 +75,20 @@ let rec scan cursor tokens =
         | "read" -> scan (advance cursor) (push_token Read tokens)
         | _ -> failwith "Unknown identifier" 
       end
-  | ' ' -> scan (advance cursor) tokens
+  | ' ' -> scan (advance cursor) tokens (* skip whitespace *)
   | unknown -> failwith ("Unknown token: " ^ (Char.escaped unknown))
-
-let string_of_token tok =
-  let string_of_tok_type = function
-    | LeftParen -> "LeftParen"
-    | RightParen -> "RightParen"
-    | Plus -> "Plus"
-    | Identifier s -> "Identifier " ^ s
-    | Number i -> "Number " ^ (string_of_int i)
-    | Minus -> "Minus"
-    | _ -> "" in
-  string_of_tok_type tok.token_type
 
 let tokenise ?(print=false) (source: string) =
   let cursor = { source; start = 0; curr = 0; line = 0 } in
   let tokens = scan cursor [] in
   if print then begin
-    List.iter (fun t -> print_endline (string_of_token t)) tokens;
+    List.iter (fun t -> print_endline (show_tok_type t.token_type)) tokens;
     tokens
   end else tokens
 
 let rec parse_prim tokens = match tokens with
   | { token_type = Number i } :: r -> Fixnum i, r
-  | a :: _r -> print_endline (string_of_token a); failwith "not implemented yet"
+  | a :: _ -> print_endline (show_tok_type a.token_type); failwith "not implemented yet"
   | _ -> failwith "scuffed"
 
 and parse_expr tokens = match tokens with
@@ -108,8 +99,7 @@ and parse_expr tokens = match tokens with
 | { token_type = Minus } :: r ->
   let exp, r = parse_expr r in
   Neg exp, r
-| { token_type = Read } :: r ->
-  Read, r
+| { token_type = Read } :: r -> Read, r
 | _ -> parse_prim tokens
 
 and parse' (tokens: token list) : expr * token list = match tokens with
@@ -119,6 +109,6 @@ and parse' (tokens: token list) : expr * token list = match tokens with
     | hd :: r when hd.token_type = RightParen -> e, r
     | _ -> failwith "expected closing parenthesis"
   end
-  | _ -> failwith "cooked"
+  | _ -> failwith "expressions should start with a left parenthesis"
 
 let parse tokens = fst (parse' tokens)
