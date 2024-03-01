@@ -9,12 +9,22 @@ type expr =
 let rec exp = function
   | Fixnum i -> i
   | Read ->
-      print_string "Input Fixnum: ";
+      print_string "read: ";
       read_line () |> int_of_string 
   | Add (a, b) -> exp a + exp b
   | Neg e -> -exp e
 
-let interpret program = exp program
+let rec constant_fold ast = match ast with
+  | Fixnum i -> Fixnum i
+  | Add (Fixnum a, Fixnum b) -> Fixnum (a + b)
+  | Add (lhs, rhs) -> Add (constant_fold lhs, constant_fold rhs)
+  | Neg (Fixnum x) -> Fixnum (-x)
+  | Neg e -> Neg (constant_fold e)
+  | _ -> ast 
+
+let interpret program =
+  let partial_eval = constant_fold program in
+  exp partial_eval
 
 type tok_type =
   | LeftParen
@@ -97,7 +107,7 @@ and parse_expr tokens = match tokens with
   let b, r  = parse' r in
   Add (a, b), r
 | { token_type = Minus } :: r ->
-  let exp, r = parse_expr r in
+  let exp, r = parse' r in
   Neg exp, r
 | { token_type = Read } :: r -> Read, r
 | _ -> parse_prim tokens
@@ -109,6 +119,6 @@ and parse' (tokens: token list) : expr * token list = match tokens with
     | hd :: r when hd.token_type = RightParen -> e, r
     | _ -> failwith "expected closing parenthesis"
   end
-  | _ -> failwith "expressions should start with a left parenthesis"
+  | _ -> parse_expr tokens
 
 let parse tokens = fst (parse' tokens)
