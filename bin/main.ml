@@ -1,6 +1,6 @@
 open Coe
 
-let test_program_src = "(+ (+ (5) (-8)) (6))"
+let test_program_src = "(+ (+ (5) (read)) (6))"
 
 let () =
   let output = test_program_src

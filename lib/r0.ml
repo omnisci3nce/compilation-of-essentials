@@ -9,8 +9,8 @@ type expr =
 let rec exp = function
   | Fixnum i -> i
   | Read ->
-      let user_input = read_line () in
-      int_of_string user_input
+      print_string "Input Fixnum: ";
+      read_line () |> int_of_string 
   | Add (a, b) -> exp a + exp b
   | Neg e -> -exp e
 
@@ -21,8 +21,9 @@ type tok_type =
   | RightParen
   | Plus
   | Minus
-  | Identifier
   | Number of int
+  | Identifier of string
+  | Read
   | EOF
 type literal = Num
 
@@ -32,7 +33,6 @@ type cursor = {
   start : int;
   curr : int; (** Current position *)
   line : int }
-
 type lexer = {
   cur: cursor;
   tokens: token list
@@ -45,13 +45,16 @@ let push_token tok tokens =
   let new_token = { token_type = tok } in
   tokens @ [new_token] 
 
+let rec scan_until_end predicate cursor acc =
+  let next = peek cursor in
+  if predicate next then
+    scan_until_end predicate (advance cursor) (acc ^ Char.escaped next)
+  else (cursor, acc)
+
 let scan_number cursor =
-  let rec scan_until_end cursor acc =
-    let next = peek cursor in
-    if is_digit next then
-      scan_until_end (advance cursor) (acc ^ Char.escaped next)
-    else (cursor, acc) in
-  scan_until_end cursor (String.get cursor.source cursor.curr |> Char.escaped)
+  scan_until_end is_digit cursor (String.get cursor.source cursor.curr |> Char.escaped)
+let scan_identifier cursor =
+  scan_until_end is_alpha_numeric cursor (String.get cursor.source cursor.curr |> Char.escaped)
 
 let rec scan cursor tokens =
   if is_at_end cursor then tokens else
@@ -64,6 +67,12 @@ let rec scan cursor tokens =
   | c when is_digit c ->
       let cursor, number = scan_number cursor in
       scan (advance cursor) (push_token (Number (int_of_string number)) tokens) 
+  | c when is_alpha c ->
+      let cursor, ident_str = scan_identifier cursor in
+      begin match ident_str with
+        | "read" -> scan (advance cursor) (push_token Read tokens)
+        | _ -> failwith "Unknown identifier" 
+      end
   | ' ' -> scan (advance cursor) tokens
   | unknown -> failwith ("Unknown token: " ^ (Char.escaped unknown))
 
@@ -72,11 +81,11 @@ let string_of_token tok =
     | LeftParen -> "LeftParen"
     | RightParen -> "RightParen"
     | Plus -> "Plus"
-    | Identifier -> "Identifier"
+    | Identifier s -> "Identifier " ^ s
     | Number i -> "Number " ^ (string_of_int i)
     | Minus -> "Minus"
     | _ -> "" in
-string_of_tok_type tok.token_type
+  string_of_tok_type tok.token_type
 
 let tokenise ?(print=false) (source: string) =
   let cursor = { source; start = 0; curr = 0; line = 0 } in
@@ -87,9 +96,9 @@ let tokenise ?(print=false) (source: string) =
   end else tokens
 
 let rec parse_prim tokens = match tokens with
-  | { token_type = Number i } :: r -> Fixnum i, r 
-  | a :: _r -> print_endline (string_of_token a); failwith "not done"
-  | _ -> failwith ""
+  | { token_type = Number i } :: r -> Fixnum i, r
+  | a :: _r -> print_endline (string_of_token a); failwith "not implemented yet"
+  | _ -> failwith "scuffed"
 
 and parse_expr tokens = match tokens with
 | { token_type = Plus } :: r ->
@@ -99,6 +108,8 @@ and parse_expr tokens = match tokens with
 | { token_type = Minus } :: r ->
   let exp, r = parse_expr r in
   Neg exp, r
+| { token_type = Read } :: r ->
+  Read, r
 | _ -> parse_prim tokens
 
 and parse' (tokens: token list) : expr * token list = match tokens with
