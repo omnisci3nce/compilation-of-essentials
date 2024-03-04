@@ -21,6 +21,11 @@ let rec exp env = function
       let new_env = env @ [(binding.label, exp env binding.initial)] in
       exp new_env binding.body
 
+let rec uniqueify symbol_table ast = match ast with
+  | Fixnum i -> exp
+  | Let binding ->
+      
+
 module C0 = struct
 
 end
